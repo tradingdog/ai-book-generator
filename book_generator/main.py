@@ -91,7 +91,6 @@ class BookGeneratorApp:
         print("-" * 30)
         
         # 如果命令行参数提供了文件路径
-        import sys
         if len(sys.argv) > 1 and os.path.exists(sys.argv[1]):
             file_path = sys.argv[1]
             print(f"使用命令行参数指定的文件: {file_path}")
@@ -293,13 +292,15 @@ class BookGeneratorApp:
             self.content_generator = ContentGenerator(self.original_content)
             
             # 生成内容并显示进度
+            final_progress = None
             for progress in self.content_generator.generate_book(self.outline, resume):
                 self._display_progress(progress)
+                final_progress = progress
             
-            if progress.status == "completed":
+            if final_progress and final_progress.status == "completed":
                 print("\n内容生成完成！")
-            elif progress.status == "error":
-                raise Exception(f"生成失败: {progress.error_message}")
+            elif final_progress and final_progress.status == "error":
+                raise Exception(f"生成失败: {final_progress.error_message}")
                 
         except Exception as e:
             raise Exception(f"生成内容失败: {e}")

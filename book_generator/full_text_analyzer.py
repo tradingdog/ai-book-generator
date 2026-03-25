@@ -112,8 +112,9 @@ class FullTextAnalyzer:
             preview = accumulated_summary[:200] + "..." if len(accumulated_summary) > 200 else accumulated_summary
             print(f"  当前理解: {preview}\n")
             
-            # 保存进度
+            # 保存进度和理解历史
             self._save_progress()
+            self._save_understanding_history(i, accumulated_summary)
         
         # 全文阅读完成后，生成最终分析
         print("\n全文阅读完成，正在生成最终分析...")
@@ -308,6 +309,38 @@ class FullTextAnalyzer:
         progress_file = os.path.join(temp_dir, "reading_progress.json")
         with open(progress_file, 'w', encoding='utf-8') as f:
             json.dump(asdict(self.progress), f, ensure_ascii=False, indent=2)
+    
+    def _save_understanding_history(self, chunk_number: int, understanding: str) -> None:
+        """保存每次的理解历史
+        
+        将每一批次的完整理解保存到单独的文件，方便用户查看完整理解过程。
+        
+        Args:
+            chunk_number: 当前块编号
+            understanding: 当前的理解内容
+        """
+        temp_dir = self.config.get_temp_dir()
+        history_dir = os.path.join(temp_dir, "understanding_history")
+        os.makedirs(history_dir, exist_ok=True)
+        
+        # 保存当前批次的理解
+        history_file = os.path.join(history_dir, f"chunk_{chunk_number:03d}_understanding.md")
+        with open(history_file, 'w', encoding='utf-8') as f:
+            f.write(f"# 第 {chunk_number} 批次的AI理解\n\n")
+            f.write(f"**时间**: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+            f.write(f"**状态**: 阅读中（{chunk_number}/{self.progress.total_chunks}）\n\n")
+            f.write("---\n\n")
+            f.write(understanding)
+        
+        # 同时更新一个汇总文件
+        summary_file = os.path.join(history_dir, "complete_understanding.md")
+        with open(summary_file, 'w', encoding='utf-8') as f:
+            f.write(f"# AI完整理解记录\n\n")
+            f.write(f"**总批次**: {self.progress.total_chunks}\n\n")
+            f.write(f"**已完成**: {chunk_number}\n\n")
+            f.write(f"**最后更新**: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+            f.write("---\n\n")
+            f.write(understanding)
     
     def load_progress(self) -> bool:
         """加载阅读进度"""

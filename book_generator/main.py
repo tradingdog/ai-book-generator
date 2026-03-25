@@ -104,7 +104,7 @@ class BookGeneratorApp:
     def _print_banner(self) -> None:
         """打印程序横幅"""
         print("=" * 50)
-        print("     AI辅助书籍生成器 v1.2.1")
+        print("     AI辅助书籍生成器 v1.2.2")
         print("=" * 50)
         print("将大文本文件转换为结构完整的书籍")
         print("-" * 50)

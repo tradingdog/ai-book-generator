@@ -269,14 +269,83 @@ class OutlineGenerator:
                     return self._create_default_outline(total_chapters, chapter_target, content_analysis)
     
     def _extract_json(self, text: str) -> Optional[str]:
-        """从文本中提取JSON字符串"""
+        """从文本中提取JSON字符串
+        
+        尝试多种方法提取有效的JSON：
+        1. 直接提取花括号包裹的内容
+        2. 尝试修复常见的JSON格式错误
+        3. 使用正则表达式提取JSON对象
+        """
+        import re
+        
+        # 方法1: 直接提取花括号内容
         start = text.find('{')
         end = text.rfind('}')
         
         if start != -1 and end != -1 and end > start:
-            return text[start:end+1]
+            json_str = text[start:end+1]
+            
+            # 尝试解析，如果成功直接返回
+            try:
+                json.loads(json_str)
+                return json_str
+            except json.JSONDecodeError:
+                # 尝试修复常见的JSON错误
+                fixed = self._fix_common_json_errors(json_str)
+                try:
+                    json.loads(fixed)
+                    return fixed
+                except json.JSONDecodeError:
+                    pass
+        
+        # 方法2: 尝试查找所有可能的JSON对象
+        # 匹配最外层的花括号对
+        json_pattern = r'\{[\s\S]*?\}'
+        matches = re.findall(json_pattern, text)
+        
+        for match in matches:
+            try:
+                json.loads(match)
+                return match
+            except json.JSONDecodeError:
+                # 尝试修复
+                fixed = self._fix_common_json_errors(match)
+                try:
+                    json.loads(fixed)
+                    return fixed
+                except json.JSONDecodeError:
+                    continue
         
         return None
+    
+    def _fix_common_json_errors(self, json_str: str) -> str:
+        """修复常见的JSON格式错误
+        
+        Args:
+            json_str: 可能有格式错误的JSON字符串
+            
+        Returns:
+            修复后的JSON字符串
+        """
+        import re
+        
+        fixed = json_str
+        
+        # 1. 移除多余的逗号（在}或]之前的逗号）
+        fixed = re.sub(r',(\s*[}\]])', r'\1', fixed)
+        
+        # 2. 修复缺失的逗号（在""之间或}{之间）
+        fixed = re.sub(r'"\s*"', '", "', fixed)
+        fixed = re.sub(r'\}\s*\{', '}, {', fixed)
+        
+        # 3. 修复单引号为双引号
+        fixed = fixed.replace("'", '"')
+        
+        # 4. 修复末尾多余的逗号
+        fixed = re.sub(r',(\s*\])', r'\1', fixed)
+        fixed = re.sub(r',(\s*\})', r'\1', fixed)
+        
+        return fixed
     
     def _validate_and_fix_outline(
         self,

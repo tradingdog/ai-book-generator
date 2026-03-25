@@ -11,12 +11,24 @@ import time
 import argparse
 from typing import Optional
 
-from .config import get_config, reload_config
-from .file_reader import FileReader, get_file_stats
-from .doubao_client import DoubaoClient
-from .outline_generator import OutlineGenerator, BookOutline
-from .content_generator import ContentGenerator, GenerationProgress
-from .doc_exporter import DocExporter
+# 处理相对导入，支持直接运行和作为模块导入
+if __package__ is None:
+    # 直接运行文件时，将上级目录加入路径
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from book_generator.config import get_config, reload_config
+    from book_generator.file_reader import FileReader, get_file_stats
+    from book_generator.doubao_client import DoubaoClient
+    from book_generator.outline_generator import OutlineGenerator, BookOutline
+    from book_generator.content_generator import ContentGenerator, GenerationProgress
+    from book_generator.doc_exporter import DocExporter
+else:
+    # 作为模块导入时，使用相对导入
+    from .config import get_config, reload_config
+    from .file_reader import FileReader, get_file_stats
+    from .doubao_client import DoubaoClient
+    from .outline_generator import OutlineGenerator, BookOutline
+    from .content_generator import ContentGenerator, GenerationProgress
+    from .doc_exporter import DocExporter
 
 
 class BookGeneratorApp:

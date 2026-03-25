@@ -22,6 +22,7 @@ if __package__ is None:
     from book_generator.content_generator import ContentGenerator, GenerationProgress
     from book_generator.doc_exporter import DocExporter
     from book_generator.full_text_analyzer import FullTextAnalyzer
+    from book_generator.logger import get_logger, BookGeneratorLogger
 else:
     # 作为模块导入时，使用相对导入
     from .config import get_config, reload_config
@@ -31,6 +32,7 @@ else:
     from .content_generator import ContentGenerator, GenerationProgress
     from .doc_exporter import DocExporter
     from .full_text_analyzer import FullTextAnalyzer
+    from .logger import get_logger, BookGeneratorLogger
 
 
 class BookGeneratorApp:
@@ -48,53 +50,61 @@ class BookGeneratorApp:
     def __init__(self) -> None:
         """初始化应用程序"""
         self.config = get_config()
+        self.logger: BookGeneratorLogger = get_logger()
         self.client: Optional[DoubaoClient] = None
         self.outline_generator: Optional[OutlineGenerator] = None
         self.content_generator: Optional[ContentGenerator] = None
         self.file_reader: Optional[FileReader] = None
         self.outline: Optional[BookOutline] = None
         self.original_content: str = ""
+        self.analysis_result: Optional[dict] = None
         
     def run(self) -> None:
         """运行应用程序"""
         self._print_banner()
+        self.logger.info(f"日志文件: {self.logger.get_log_file_path()}")
         
         try:
             # 步骤1: 选择输入文件
+            self.logger.step(1, 6, "选择输入文件")
             self._step_select_file()
             
             # 步骤2: 验证API配置
+            self.logger.step(2, 6, "验证API配置")
             self._step_verify_api()
             
             # 步骤3: 分析文件
+            self.logger.step(3, 6, "分析文件内容")
             self._step_analyze_file()
             
             # 步骤4: 生成大纲
+            self.logger.step(4, 6, "生成书籍大纲")
             self._step_generate_outline()
             
             # 步骤5: 生成内容
+            self.logger.step(5, 6, "生成章节内容")
             self._step_generate_content()
             
             # 步骤6: 导出文档
+            self.logger.step(6, 6, "导出Word文档")
             self._step_export_document()
             
-            print("\n" + "=" * 50)
-            print("书籍生成完成！")
-            print("=" * 50)
+            self.logger.section("书籍生成完成！")
+            self.logger.info(f"输出文件: {self.config.get_output_filename()}")
             
         except KeyboardInterrupt:
-            print("\n\n用户中断操作")
+            self.logger.warning("用户中断操作")
             self._handle_interrupt()
         except Exception as e:
-            print(f"\n错误: {e}")
+            self.logger.error(f"程序异常: {e}")
             import traceback
-            traceback.print_exc()
+            self.logger.error(traceback.format_exc())
             sys.exit(1)
     
     def _print_banner(self) -> None:
         """打印程序横幅"""
         print("=" * 50)
-        print("     AI辅助书籍生成器 v1.0.0")
+        print("     AI辅助书籍生成器 v1.2.1")
         print("=" * 50)
         print("将大文本文件转换为结构完整的书籍")
         print("-" * 50)
@@ -258,6 +268,9 @@ class BookGeneratorApp:
                 print("输入无效，使用默认配置")
         
         print(f"\n正在生成大纲...")
+        self.logger.info(f"开始生成大纲: {total_chapters}章, 每章约{chapter_words}字")
+        self.logger.info(f"预计总字数: {total_chapters * chapter_words}")
+        self.logger.info("正在调用AI生成三级目录结构(章-节-小节)，这可能需要3-5分钟...")
         
         try:
             self.outline_generator = OutlineGenerator()
@@ -265,6 +278,7 @@ class BookGeneratorApp:
             # 计算目标总字数
             target_total = total_chapters * chapter_words
             
+            self.logger.info("发送请求到豆包API...")
             self.outline = self.outline_generator.generate_outline(
                 content_analysis=self.analysis_result,
                 total_words=target_total,
@@ -273,7 +287,8 @@ class BookGeneratorApp:
                 chapter_target_words=chapter_words
             )
             
-            print(f"\n大纲生成完成！")
+            self.logger.info("大纲生成完成！")
+            self.logger.info(f"书名: {self.outline.title}")
             print(f"  书名: {self.outline.title}")
             if self.outline.subtitle:
                 print(f"  副标题: {self.outline.subtitle}")

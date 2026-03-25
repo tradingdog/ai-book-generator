@@ -153,9 +153,16 @@ class OutlineGenerator:
         chapter_target = chapter_target_words
         
         system_prompt = """你是一位资深图书编辑和作家，擅长将素材重组为结构完整的书籍。
-请根据提供的内容分析，设计一部书籍的完整大纲，要求结构清晰、层级分明。
-文风要求：平实朴素，逻辑清晰，避免华丽辞藻。
-必须以JSON格式返回结果。"""
+请根据提供的内容分析，设计一部书籍的完整大纲。
+
+【强制要求】
+1. 必须返回纯JSON格式，不要包含任何markdown标记（如```json）
+2. 不要添加任何JSON之外的文字说明
+3. 确保JSON格式完全正确，所有字符串使用双引号
+4. 所有字段必须填写，不能留空
+5. 标题必须基于原文内容提炼，不能是占位符
+
+文风要求：平实朴素，逻辑清晰，避免华丽辞藻。"""
         
         prompt = f"""请为以下内容设计一部书籍的完整大纲。
 
@@ -176,28 +183,34 @@ class OutlineGenerator:
 8. 章节之间要有逻辑递进关系
 9. 子章节和小节要细致划分，像真实学术书籍一样详细
 
+【标题要求 - 非常重要】
+- 章节标题必须基于原文主题内容提炼，例如："捭阖之道"、"反应之术"、"内楗之理"
+- 不能使用"第X章 主题内容"这样的占位符
+- 标题要具体、有意义，读者一看就知道本章讲什么
+- 子章节和小节标题同样要具体，反映实际内容
+
 【输出格式】
-请以JSON格式返回，确保可以被直接解析：
+必须返回纯JSON，格式如下：
 {{
-    "title": "书籍主标题",
+    "title": "基于原文主题的书籍标题",
     "subtitle": "副标题",
     "preface_summary": "自序概要（100字左右）",
     "chapters": [
         {{
             "chapter_number": 1,
-            "title": "第一章标题",
+            "title": "具体章节标题（如：捭阖之道）",
             "target_words": {chapter_target},
             "summary": "本章内容概要（100字左右）",
             "subchapters": [
                 {{
                     "subchapter_number": "1.1",
-                    "title": "第一节标题",
+                    "title": "具体子章节标题",
                     "target_words": {chapter_target // 3},
                     "summary": "本节概要",
                     "sections": [
                         {{
                             "section_number": "1.1.1",
-                            "title": "第一小节标题",
+                            "title": "具体小节标题",
                             "target_words": {chapter_target // 6},
                             "summary": "小节概要",
                             "key_points": ["要点1", "要点2"]
@@ -214,29 +227,46 @@ class OutlineGenerator:
 }}
 
 【重要提示】
-- 每个章必须有3-4个子章节（二级标题）
-- 每个子章节必须有2-3个小节（三级标题）
-- 层级结构要清晰，像真实出版的学术书籍一样
-- 标题要具体，能准确反映内容"""
+- 只返回JSON，不要有任何其他文字
+- 所有标题必须基于原文内容，不能是占位符
+- 确保JSON格式正确，可以被Python json.loads()解析"""
         
-        try:
-            response = self.client.chat(prompt, system_prompt, temperature=0.7)
-            
-            json_str = self._extract_json(response)
-            if not json_str:
-                raise ValueError("无法从响应中提取JSON")
-            
-            data = json.loads(json_str)
-            outline = self._validate_and_fix_outline(data, total_chapters, chapter_target)
-            
-            return outline
-            
-        except json.JSONDecodeError as e:
-            print(f"JSON解析错误: {e}")
-            return self._create_default_outline(total_chapters, chapter_target)
-        except Exception as e:
-            print(f"生成大纲失败: {e}")
-            return self._create_default_outline(total_chapters, chapter_target)
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = self.client.chat(prompt, system_prompt, temperature=0.7)
+                
+                json_str = self._extract_json(response)
+                if not json_str:
+                    raise ValueError("无法从响应中提取JSON")
+                
+                data = json.loads(json_str)
+                outline = self._validate_and_fix_outline(data, total_chapters, chapter_target)
+                
+                # 检查是否使用了占位符标题
+                if self._has_placeholder_titles(outline):
+                    if attempt < max_retries - 1:
+                        print(f"警告：AI使用了占位符标题，正在重试 ({attempt + 1}/{max_retries})...")
+                        continue
+                
+                return outline
+                
+            except json.JSONDecodeError as e:
+                print(f"JSON解析错误 (尝试 {attempt + 1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    print("正在重试...")
+                    continue
+                else:
+                    print("所有重试失败，使用默认大纲")
+                    return self._create_default_outline(total_chapters, chapter_target, content_analysis)
+            except Exception as e:
+                print(f"生成大纲失败 (尝试 {attempt + 1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    print("正在重试...")
+                    continue
+                else:
+                    print("所有重试失败，使用默认大纲")
+                    return self._create_default_outline(total_chapters, chapter_target, content_analysis)
     
     def _extract_json(self, text: str) -> Optional[str]:
         """从文本中提取JSON字符串"""
@@ -371,49 +401,94 @@ class OutlineGenerator:
             style=style
         )
     
+    def _has_placeholder_titles(self, outline: BookOutline) -> bool:
+        """检查大纲是否使用了占位符标题"""
+        placeholder_patterns = ['主题内容', '第1节', '第2节', '第3节', '第1.1小节', '第1.2小节']
+        
+        for chapter in outline.chapters:
+            # 检查章节标题
+            if any(pattern in chapter.title for pattern in placeholder_patterns):
+                return True
+            # 检查子章节标题
+            for sub in chapter.subchapters:
+                if any(pattern in sub.title for pattern in placeholder_patterns):
+                    return True
+                # 检查小节标题
+                for sec in sub.sections:
+                    if any(pattern in sec.title for pattern in placeholder_patterns):
+                        return True
+        return False
+    
     def _create_default_outline(
         self,
         total_chapters: int,
-        target_words: int
+        target_words: int,
+        content_analysis: Dict[str, Any] = None
     ) -> BookOutline:
-        """创建默认大纲"""
+        """创建默认大纲（当AI生成失败时使用）
+        
+        尝试从content_analysis中提取主题信息生成更有意义的标题
+        """
+        # 尝试从分析结果中提取主题
+        themes = []
+        if content_analysis:
+            if 'main_theme' in content_analysis:
+                themes.append(content_analysis['main_theme'])
+            if 'key_points' in content_analysis and isinstance(content_analysis['key_points'], list):
+                themes.extend(content_analysis['key_points'][:total_chapters])
+        
+        # 如果没有提取到足够主题，使用通用主题
+        while len(themes) < total_chapters:
+            themes.append(f"主题{len(themes) + 1}")
+        
         chapters: List[ChapterOutline] = []
         
         for i in range(1, total_chapters + 1):
+            chapter_theme = themes[i - 1] if i <= len(themes) else f"主题{i}"
             subchapters: List[SubChapterOutline] = []
+            
             for j in range(1, 4):
                 sections: List[SectionOutline] = []
                 for k in range(1, 3):
                     sections.append(SectionOutline(
                         section_number=f'{i}.{j}.{k}',
-                        title=f'第{j}.{k}小节',
+                        title=f'{chapter_theme}之{k}',
                         target_words=target_words // 6,
-                        summary='小节概要',
-                        key_points=['要点']
+                        summary=f'探讨{chapter_theme}的深层内涵',
+                        key_points=['核心要点']
                     ))
                 
                 subchapters.append(SubChapterOutline(
                     subchapter_number=f'{i}.{j}',
-                    title=f'第{j}节',
+                    title=f'{chapter_theme}层面{j}',
                     target_words=target_words // 3,
-                    summary=f'第{j}节概要',
+                    summary=f'从层面{j}分析{chapter_theme}',
                     sections=sections,
-                    key_points=['要点']
+                    key_points=['核心要点']
                 ))
             
             chapters.append(ChapterOutline(
                 chapter_number=i,
-                title=f'第{i}章 主题内容',
+                title=f'{chapter_theme}',
                 target_words=target_words,
-                summary=f'本章将详细探讨第{i}部分的核心内容。',
+                summary=f'本章深入探讨{chapter_theme}的核心要义与实践价值。',
                 subchapters=subchapters,
-                key_points=['核心概念', '重要观点', '实践意义']
+                key_points=['核心概念', '实践方法', '应用价值']
             ))
         
+        # 尝试从分析结果中提取书名
+        title = '重构之作'
+        subtitle = '基于原始素材的全新呈现'
+        if content_analysis:
+            if 'main_theme' in content_analysis:
+                main_theme = content_analysis['main_theme']
+                title = f'{main_theme}研究'
+                subtitle = f'基于{main_theme}的深度解读'
+        
         return BookOutline(
-            title='重构之作',
-            subtitle='基于原始素材的全新呈现',
-            preface_summary='本书是基于原始素材重新整理而成的作品，力求以平实朴素的语言呈现内容。',
+            title=title,
+            subtitle=subtitle,
+            preface_summary='本书是基于原始素材重新整理而成的作品，力求以平实朴素的语言呈现内容精髓。',
             chapters=chapters,
             total_words=total_chapters * target_words,
             style='plain'

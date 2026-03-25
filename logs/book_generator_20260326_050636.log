@@ -24,3 +24,24 @@ AI书籍生成器日志 - 2026-03-26 05:06:36
 
 【步骤 5/6】生成章节内容
 ----------------------------------------
+[05:15:38] [ERROR] 程序异常: 生成内容失败: 'ChapterOutline' object has no attribute 'subsections'
+[05:15:38] [ERROR] Traceback (most recent call last):
+  File "d:\Python_Program\xiaoshuo\book_generator\main.py", line 359, in _step_generate_content
+    if final_progress and final_progress.status == "completed":
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\Python_Program\xiaoshuo\book_generator\content_generator.py", line 139, in generate_book
+    chapter_content = self._generate_chapter(chapter, outline)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "d:\Python_Program\xiaoshuo\book_generator\content_generator.py", line 249, in _generate_chapter
+    - 小节安排：{', '.join(chapter.subsections)}
+                           ^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ChapterOutline' object has no attribute 'subsections'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "d:\Python_Program\xiaoshuo\book_generator\main.py", line 86, in run
+    self._step_generate_content()
+  File "d:\Python_Program\xiaoshuo\book_generator\main.py", line 369, in _step_generate_content
+Exception: 生成内容失败: 'ChapterOutline' object has no attribute 'subsections'
+

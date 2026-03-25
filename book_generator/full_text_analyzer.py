@@ -44,15 +44,17 @@ class FullTextAnalyzer:
         chunk_size: 每块文本大小
     """
     
-    def __init__(self, chunk_size: int = 8000) -> None:
+    def __init__(self, chunk_size: int = 8000, source_filename: str = "unknown") -> None:
         """初始化全文分析器
         
         Args:
             chunk_size: 每块文本的字符数，默认8000
+            source_filename: 源文件名，用于生成理解历史文件的命名
         """
         self.client = DoubaoClient()
         self.config = get_config()
         self.chunk_size = chunk_size
+        self.source_filename = source_filename
         self.progress = ReadingProgress(
             total_chunks=0,
             completed_chunks=0,
@@ -314,6 +316,7 @@ class FullTextAnalyzer:
         """保存每次的理解历史
         
         将每一批次的完整理解保存到单独的文件，方便用户查看完整理解过程。
+        文件名包含源文档名和时间戳，避免覆盖。
         
         Args:
             chunk_number: 当前块编号
@@ -323,24 +326,58 @@ class FullTextAnalyzer:
         history_dir = os.path.join(temp_dir, "understanding_history")
         os.makedirs(history_dir, exist_ok=True)
         
-        # 保存当前批次的理解
-        history_file = os.path.join(history_dir, f"chunk_{chunk_number:03d}_understanding.md")
+        # 生成时间戳
+        timestamp = time.strftime('%Y%m%d_%H%M%S')
+        
+        # 清理源文件名（去除扩展名和非法字符）
+        safe_name = self._sanitize_filename(self.source_filename)
+        
+        # 保存当前批次的理解（带源文件名和时间戳）
+        history_file = os.path.join(
+            history_dir, 
+            f"{safe_name}_{timestamp}_chunk_{chunk_number:03d}.md"
+        )
         with open(history_file, 'w', encoding='utf-8') as f:
-            f.write(f"# 第 {chunk_number} 批次的AI理解\n\n")
+            f.write(f"# {self.source_filename} - 第 {chunk_number} 批次的AI理解\n\n")
+            f.write(f"**源文件**: {self.source_filename}\n\n")
             f.write(f"**时间**: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
             f.write(f"**状态**: 阅读中（{chunk_number}/{self.progress.total_chunks}）\n\n")
             f.write("---\n\n")
             f.write(understanding)
         
-        # 同时更新一个汇总文件
-        summary_file = os.path.join(history_dir, "complete_understanding.md")
+        # 同时更新一个汇总文件（带源文件名和时间戳）
+        summary_file = os.path.join(
+            history_dir, 
+            f"{safe_name}_{timestamp}_complete.md"
+        )
         with open(summary_file, 'w', encoding='utf-8') as f:
-            f.write(f"# AI完整理解记录\n\n")
+            f.write(f"# {self.source_filename} - AI完整理解记录\n\n")
+            f.write(f"**源文件**: {self.source_filename}\n\n")
             f.write(f"**总批次**: {self.progress.total_chunks}\n\n")
             f.write(f"**已完成**: {chunk_number}\n\n")
             f.write(f"**最后更新**: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
             f.write("---\n\n")
             f.write(understanding)
+    
+    def _sanitize_filename(self, filename: str) -> str:
+        """清理文件名，移除非法字符
+        
+        Args:
+            filename: 原始文件名
+            
+        Returns:
+            清理后的文件名
+        """
+        # 移除扩展名
+        name = os.path.splitext(filename)[0]
+        # 替换非法字符
+        invalid_chars = '<>:"/\\|?*'
+        for char in invalid_chars:
+            name = name.replace(char, '_')
+        # 限制长度
+        if len(name) > 50:
+            name = name[:50]
+        return name
     
     def load_progress(self) -> bool:
         """加载阅读进度"""

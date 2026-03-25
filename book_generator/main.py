@@ -58,6 +58,7 @@ class BookGeneratorApp:
         self.outline: Optional[BookOutline] = None
         self.original_content: str = ""
         self.analysis_result: Optional[dict] = None
+        self.source_filename: str = "unknown"
         
     def run(self) -> None:
         """运行应用程序"""
@@ -104,7 +105,7 @@ class BookGeneratorApp:
     def _print_banner(self) -> None:
         """打印程序横幅"""
         print("=" * 50)
-        print("     AI辅助书籍生成器 v1.2.3")
+        print("     AI辅助书籍生成器 v1.2.4")
         print("=" * 50)
         print("将大文本文件转换为结构完整的书籍")
         print("-" * 50)
@@ -136,6 +137,8 @@ class BookGeneratorApp:
         # 创建文件读取器
         try:
             self.file_reader = FileReader(file_path)
+            # 保存源文件名
+            self.source_filename = os.path.basename(file_path)
             stats = self.file_reader.get_statistics()
             
             self.logger.info("文件信息:")
@@ -198,8 +201,8 @@ class BookGeneratorApp:
         self.logger.info("这可能需要一些时间，请耐心等待...")
         
         try:
-            # 创建全文分析器
-            analyzer = FullTextAnalyzer(chunk_size=8000)
+            # 创建全文分析器，传入源文件名
+            analyzer = FullTextAnalyzer(chunk_size=8000, source_filename=self.source_filename)
             
             # 执行全文分析
             self.analysis_result = analyzer.analyze_full_text(self.original_content)

@@ -7,5 +7,5 @@ AI辅助书籍生成器
 作者: AI Assistant
 """
 
-__version__ = "1.2.3"
+__version__ = "1.2.4"
 __author__ = "AI Assistant"

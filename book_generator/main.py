@@ -11,7 +11,7 @@ import time
 import argparse
 from typing import Optional
 
-# 处理相对导入，支持直接运行和作为模块导入
+# 处理相对导入，支持直接运行和模块导入
 if __package__ is None:
     # 直接运行文件时，将上级目录加入路径
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -21,6 +21,7 @@ if __package__ is None:
     from book_generator.outline_generator import OutlineGenerator, BookOutline
     from book_generator.content_generator import ContentGenerator, GenerationProgress
     from book_generator.doc_exporter import DocExporter
+    from book_generator.full_text_analyzer import FullTextAnalyzer
 else:
     # 作为模块导入时，使用相对导入
     from .config import get_config, reload_config
@@ -29,6 +30,7 @@ else:
     from .outline_generator import OutlineGenerator, BookOutline
     from .content_generator import ContentGenerator, GenerationProgress
     from .doc_exporter import DocExporter
+    from .full_text_analyzer import FullTextAnalyzer
 
 
 class BookGeneratorApp:
@@ -175,41 +177,51 @@ class BookGeneratorApp:
     
     def _step_analyze_file(self) -> None:
         """步骤3: 分析文件内容"""
-        print("\n【步骤3/6】分析文件内容")
+        print("\n【步骤3/6】全文阅读与分析")
         print("-" * 30)
         
         if not self.client:
             raise Exception("API客户端未初始化")
         
-        # 提取样本用于分析（取前8000字符）
-        sample_content = self.original_content[:8000]
-        
-        print("正在分析内容主题和结构...")
+        # 使用全文分析器进行完整阅读
+        print(f"原始文本总长度: {len(self.original_content):,} 字符")
+        print("\n⚠️  重要：现在将分批投喂全文给AI，确保其完整理解原始素材")
+        print("这可能需要一些时间，请耐心等待...\n")
         
         try:
-            # 进行内容分析
-            analysis = self.client.analyze_content(sample_content, "summary")
+            # 创建全文分析器
+            analyzer = FullTextAnalyzer(chunk_size=8000)
+            
+            # 执行全文分析
+            self.analysis_result = analyzer.analyze_full_text(self.original_content)
+            
+            print("\n" + "=" * 50)
+            print("全文分析完成！")
+            print("=" * 50)
             
             print("\n分析结果:")
-            if "main_theme" in analysis:
-                print(f"  主要主题: {analysis['main_theme']}")
-            if "summary" in analysis:
-                summary = analysis['summary']
-                if len(summary) > 100:
-                    summary = summary[:100] + "..."
-                print(f"  内容摘要: {summary}")
-            if "key_points" in analysis and isinstance(analysis['key_points'], list):
-                print(f"  关键要点:")
-                for point in analysis['key_points'][:3]:
-                    print(f"    - {point}")
+            if "main_theme" in self.analysis_result:
+                print(f"  📌 主要主题: {self.analysis_result['main_theme']}")
+            if "summary" in self.analysis_result:
+                summary = self.analysis_result['summary']
+                if len(summary) > 150:
+                    summary = summary[:150] + "..."
+                print(f"  📝 内容摘要: {summary}")
+            if "key_points" in self.analysis_result and isinstance(self.analysis_result['key_points'], list):
+                print(f"  🔑 关键要点:")
+                for point in self.analysis_result['key_points'][:5]:
+                    print(f"    • {point}")
+            if "characters" in self.analysis_result:
+                print(f"  👥 涉及人物/群体: {', '.join(self.analysis_result['characters'][:3])}")
             
-            # 保存分析结果供后续使用
-            self.analysis_result = analysis
+            print(f"\n✅ AI已完成全文阅读，现在可以基于完整理解生成书籍")
             
         except Exception as e:
-            print(f"内容分析失败: {e}")
-            print("将使用默认设置继续...")
-            self.analysis_result = {"main_theme": "未命名主题", "summary": "内容待分析"}
+            print(f"\n❌ 全文分析失败: {e}")
+            print("将使用简化分析继续...")
+            # 降级处理：使用简单的片段分析
+            sample_content = self.original_content[:8000]
+            self.analysis_result = self.client.analyze_content(sample_content, "summary")
     
     def _step_generate_outline(self) -> None:
         """步骤4: 生成书籍大纲"""
@@ -256,7 +268,9 @@ class BookGeneratorApp:
             self.outline = self.outline_generator.generate_outline(
                 content_analysis=self.analysis_result,
                 total_words=target_total,
-                sample_content=self.original_content[:5000]
+                sample_content=self.original_content[:5000],
+                total_chapters=total_chapters,
+                chapter_target_words=chapter_words
             )
             
             print(f"\n大纲生成完成！")
@@ -301,7 +315,23 @@ class BookGeneratorApp:
         print("此过程可能需要较长时间，请耐心等待...\n")
         
         try:
-            self.content_generator = ContentGenerator(self.original_content)
+            # 获取全文理解摘要
+            full_understanding = ""
+            if hasattr(self, 'analysis_result') and self.analysis_result:
+                if 'summary' in self.analysis_result:
+                    full_understanding = self.analysis_result['summary']
+                # 如果有更详细的理解，也加入
+                if 'raw_understanding' in self.analysis_result:
+                    full_understanding = self.analysis_result['raw_understanding']
+            
+            print(f"\n📚 全文理解摘要（前200字）:")
+            preview = full_understanding[:200] + "..." if len(full_understanding) > 200 else full_understanding
+            print(f"  {preview}\n")
+            
+            self.content_generator = ContentGenerator(
+                original_content=self.original_content,
+                full_understanding=full_understanding
+            )
             
             # 生成内容并显示进度
             final_progress = None

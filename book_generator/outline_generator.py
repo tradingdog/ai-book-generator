@@ -108,7 +108,9 @@ class OutlineGenerator:
         self,
         content_analysis: Dict[str, Any],
         total_words: int,
-        sample_content: str = ""
+        sample_content: str = "",
+        total_chapters: int = None,
+        chapter_target_words: int = None
     ) -> BookOutline:
         """生成书籍大纲
         
@@ -118,13 +120,20 @@ class OutlineGenerator:
             content_analysis: 内容分析结果字典
             total_words: 目标总字数
             sample_content: 原始文本样本（用于AI理解原文风格）
+            total_chapters: 总章节数（可选，默认从配置读取）
+            chapter_target_words: 每章目标字数（可选，默认从配置读取）
             
         Returns:
             完整的书籍大纲对象
         """
         style = self.config.get_style()
-        total_chapters = self.config.get_total_chapters()
-        chapter_target = self.config.get_chapter_target_words()
+        # 使用传入的参数或从配置读取
+        if total_chapters is None:
+            total_chapters = self.config.get_total_chapters()
+        if chapter_target_words is None:
+            chapter_target_words = self.config.get_chapter_target_words()
+        
+        chapter_target = chapter_target_words
         
         # 构建提示词
         system_prompt = """你是一位资深图书编辑和作家，擅长将素材重组为结构完整的书籍。

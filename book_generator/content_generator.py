@@ -61,22 +61,25 @@ class ContentGenerator:
         config: 配置对象
         progress: 生成进度
         original_content: 原始文本内容（用于素材提取）
+        full_understanding: 对全文理解的摘要
     
     Example:
-        >>> generator = ContentGenerator(original_content)
+        >>> generator = ContentGenerator(original_content, full_understanding)
         >>> for progress in generator.generate_book(outline):
         ...     print(f"进度: {progress.progress_percentage:.1f}%")
     """
     
-    def __init__(self, original_content: str = "") -> None:
+    def __init__(self, original_content: str = "", full_understanding: str = "") -> None:
         """初始化内容生成器
         
         Args:
             original_content: 原始文本内容，用于提取素材
+            full_understanding: 对全文的理解摘要，用于指导内容生成
         """
         self.client = DoubaoClient()
         self.config = get_config()
         self.original_content = original_content
+        self.full_understanding = full_understanding
         self.progress = GenerationProgress(
             total_chapters=0,
             completed_chapters=0,
@@ -154,6 +157,8 @@ class ContentGenerator:
     def _generate_preface(self, outline: BookOutline) -> str:
         """生成自序
         
+        基于对全文素材的完整理解，撰写真实的自序。
+        
         Args:
             outline: 书籍大纲
             
@@ -161,6 +166,7 @@ class ContentGenerator:
             自序内容
         """
         system_prompt = """你是一位作家，正在为自己的新书撰写自序。
+你必须基于提供的原始素材理解来撰写，不能虚构内容。
 文风要求：平实朴素，真诚自然，避免华丽辞藻。
 自序应该介绍写作背景、书籍内容概要，以及对读者的期望。"""
         
@@ -170,32 +176,41 @@ class ContentGenerator:
         elif outline.style == "academic":
             style_desc = "学术严谨，论述深入"
         
+        # 提取原始素材的关键信息用于自序
+        original_sample = self.original_content[:3000] if len(self.original_content) > 3000 else self.original_content
+        
         prompt = f"""请为书籍《{outline.title}》撰写一篇自序。
 
-【书籍信息】
+【⚠️ 重要提示】
+这篇自序必须基于以下对原始素材的完整理解来撰写，不能虚构内容：
+
+【全文理解摘要】
+{self.full_understanding[:2000]}
+
+【原始素材样本】
+{original_sample}
+
+【书籍结构】
 - 主标题：{outline.title}
 - 副标题：{outline.subtitle}
-- 文风：{style_desc}
 - 总章节数：{len(outline.chapters)}章
-
-【自序概要】
-{outline.preface_summary}
+- 文风：{style_desc}
 
 【章节主题】
-{chr(10).join([f"第{ch.chapter_number}章：{ch.title}" for ch in outline.chapters[:5]])}
-...
+{chr(10).join([f"第{ch.chapter_number}章：{ch.title}" for ch in outline.chapters])}
 
 【写作要求】
 1. 字数约2000-3000字
-2. 介绍写作背景和动机
+2. 基于真实素材介绍写作背景和动机（不要虚构）
 3. 概述书籍的主要内容和结构
 4. 说明本书的特点和价值
 5. 对读者表达期望
 6. 文风平实朴素，真诚自然
+7. 必须基于提供的素材，不能编造不存在的内容
 
 请直接输出自序正文，不需要标题。"""
         
-        print(f"正在生成自序...")
+        print(f"正在生成自序（基于全文理解）...")
         response = self.client.chat(prompt, system_prompt, temperature=0.7)
         return response
     

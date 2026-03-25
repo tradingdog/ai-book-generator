@@ -1,0 +1,46 @@
+# AI书籍生成器配置文件
+
+# 豆包API配置
+doubao:
+  api_key: "7fb7e1ad-ff62-4d30-b19c-82d7b26b3439"
+  model: "doubao-seed-1-8-251228"
+  base_url: "https://ark.cn-beijing.volces.com/api/v3"
+  timeout: 120
+  max_retries: 3
+
+# 生成配置
+generation:
+  # 文风风格: plain(平实朴素), literary(文学性), academic(学术性)
+  style: "plain"
+  # 每章目标字数
+  chapter_target_words: 35000
+  # 总章节数
+  total_chapters: 15
+  # 是否生成自序
+  generate_preface: true
+  # 输出文件名
+  output_filename: "generated_book.docx"
+
+# 处理配置
+processing:
+  # 文本分块大小（字符数）
+  chunk_size: 4000
+  # 分块重叠大小
+  chunk_overlap: 500
+  # 请求间隔（秒）
+  request_interval: 1
+  # 保存中间结果
+  save_intermediate: true
+  # 中间结果保存目录
+  temp_dir: "./temp"
+
+# 文档格式
+document:
+  # 正文字体
+  body_font: "宋体"
+  # 正文字号
+  body_size: 12
+  # 标题字体
+  title_font: "黑体"
+  # 行距
+  line_spacing: 1.5

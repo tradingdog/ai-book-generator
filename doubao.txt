@@ -1,0 +1,4 @@
+doubao:
+  api_key: "7fb7e1ad-ff62-4d30-b19c-82d7b26b3439"
+  model: "doubao-seed-1-8-251228"
+  base_url: "https://ark.cn-beijing.volces.com/api/v3"

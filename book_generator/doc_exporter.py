@@ -191,11 +191,21 @@ class DocExporter:
         if 0 in content_dict:
             self._add_toc_entry("自序", 0)
         
-        # 章节条目
+        # 章节条目（多级目录）
         for chapter in outline.chapters:
-            if chapter.chapter_number in content_dict:
-                entry_text = f"第{chapter.chapter_number}章  {chapter.title}"
-                self._add_toc_entry(entry_text, 0)
+            # 一级标题：章
+            entry_text = f"第{chapter.chapter_number}章  {chapter.title}"
+            self._add_toc_entry(entry_text, 0)
+            
+            # 二级标题：子章节
+            for subchapter in chapter.subchapters:
+                sub_text = f"{subchapter.subchapter_number} {subchapter.title}"
+                self._add_toc_entry(sub_text, 1)
+                
+                # 三级标题：小节
+                for section in subchapter.sections:
+                    sec_text = f"{section.section_number} {section.title}"
+                    self._add_toc_entry(sec_text, 2)
         
         # 分页
         self.document.add_page_break()

@@ -278,9 +278,15 @@ class BookGeneratorApp:
             if self.outline.subtitle:
                 print(f"  副标题: {self.outline.subtitle}")
             print(f"  章节数: {len(self.outline.chapters)}章")
-            print(f"\n章节列表:")
+            print(f"\n详细目录结构:")
+            print("=" * 50)
             for ch in self.outline.chapters:
-                print(f"  第{ch.chapter_number}章: {ch.title}")
+                print(f"\n第{ch.chapter_number}章: {ch.title}")
+                print(f"  概要: {ch.summary[:60]}...")
+                for sub in ch.subchapters:
+                    print(f"  {sub.subchapter_number} {sub.title}")
+                    for sec in sub.sections:
+                        print(f"    {sec.section_number} {sec.title}")
             
             # 保存大纲
             temp_dir = self.config.get_temp_dir()

@@ -59,6 +59,7 @@ class BookGeneratorApp:
         self.original_content: str = ""
         self.analysis_result: Optional[dict] = None
         self.source_filename: str = "unknown"
+        self.auto_mode: bool = False  # 自动模式标志
         
     def run(self) -> None:
         """运行应用程序"""
@@ -105,7 +106,7 @@ class BookGeneratorApp:
     def _print_banner(self) -> None:
         """打印程序横幅"""
         print("=" * 50)
-        print("     AI辅助书籍生成器 v1.2.7")
+        print("     AI辅助书籍生成器 v1.2.8")
         print("=" * 50)
         print("将大文本文件转换为结构完整的书籍")
         print("-" * 50)
@@ -247,27 +248,30 @@ class BookGeneratorApp:
         self.logger.info(f"  每章字数: 约{chapter_words:,}字")
         self.logger.info(f"  原文总字数: {total_words:,}字")
         
-        # 确认或修改（保持终端交互）
-        print("\n是否使用以上配置生成大纲？")
-        print("  1. 使用默认配置")
-        print("  2. 自定义配置")
-        
-        choice = input("请选择 (1/2): ").strip()
-        self.logger.info(f"用户选择: {choice}")
-        
-        if choice == "2":
-            try:
-                chapters_input = input(f"章节数 (默认{total_chapters}): ").strip()
-                if chapters_input:
-                    total_chapters = int(chapters_input)
-                    self.logger.info(f"用户设置章节数: {total_chapters}")
-                
-                words_input = input(f"每章字数 (默认{chapter_words}): ").strip()
-                if words_input:
-                    chapter_words = int(words_input)
-                    self.logger.info(f"用户设置每章字数: {chapter_words}")
-            except ValueError:
-                self.logger.warning("输入无效，使用默认配置")
+        # 确认或修改（自动模式下跳过交互）
+        if not self.auto_mode:
+            print("\n是否使用以上配置生成大纲？")
+            print("  1. 使用默认配置")
+            print("  2. 自定义配置")
+            
+            choice = input("请选择 (1/2): ").strip()
+            self.logger.info(f"用户选择: {choice}")
+            
+            if choice == "2":
+                try:
+                    chapters_input = input(f"章节数 (默认{total_chapters}): ").strip()
+                    if chapters_input:
+                        total_chapters = int(chapters_input)
+                        self.logger.info(f"用户设置章节数: {total_chapters}")
+                    
+                    words_input = input(f"每章字数 (默认{chapter_words}): ").strip()
+                    if words_input:
+                        chapter_words = int(words_input)
+                        self.logger.info(f"用户设置每章字数: {chapter_words}")
+                except ValueError:
+                    self.logger.warning("输入无效，使用默认配置")
+        else:
+            self.logger.info("自动模式：使用默认配置")
         
         self.logger.info("正在生成大纲...")
         self.logger.info(f"开始生成大纲: {total_chapters}章, 每章约{chapter_words}字")
@@ -328,10 +332,14 @@ class BookGeneratorApp:
         
         resume = False
         if os.path.exists(progress_file):
-            self.logger.info("检测到未完成的生成任务")
-            choice = input("是否从上次中断处继续? (y/n): ").strip().lower()
-            resume = choice in ('y', 'yes', '是')
-            self.logger.info(f"用户选择: {'继续' if resume else '重新开始'}")
+            if not self.auto_mode:
+                self.logger.info("检测到未完成的生成任务")
+                choice = input("是否从上次中断处继续? (y/n): ").strip().lower()
+                resume = choice in ('y', 'yes', '是')
+                self.logger.info(f"用户选择: {'继续' if resume else '重新开始'}")
+            else:
+                self.logger.info("自动模式：检测到未完成任务，自动继续")
+                resume = True
         
         self.logger.info(f"开始生成内容，共 {len(self.outline.chapters)} 章需要生成")
         self.logger.info("此过程可能需要较长时间，请耐心等待...")
@@ -394,7 +402,12 @@ class BookGeneratorApp:
         
         # 获取输出路径
         default_output = self.config.get_output_filename()
-        output_path = input(f"请输入输出文件路径 (默认: {default_output}): ").strip().strip('"')
+        
+        if not self.auto_mode:
+            output_path = input(f"请输入输出文件路径 (默认: {default_output}): ").strip().strip('"')
+        else:
+            output_path = default_output
+            self.logger.info(f"自动模式：使用默认输出路径: {output_path}")
         
         if not output_path:
             output_path = default_output
@@ -438,6 +451,7 @@ def main():
     parser.add_argument('-c', '--config', default='config.yaml', help='配置文件路径')
     parser.add_argument('-o', '--output', help='输出文件路径')
     parser.add_argument('--resume', action='store_true', help='从上次中断处继续')
+    parser.add_argument('--auto', action='store_true', help='自动模式：使用默认配置，无需交互')
     
     args = parser.parse_args()
     
@@ -447,6 +461,11 @@ def main():
     
     # 运行应用程序
     app = BookGeneratorApp()
+    
+    # 如果指定了--auto，设置自动模式
+    if args.auto:
+        app.auto_mode = True
+    
     app.run()
 
 

@@ -104,7 +104,7 @@ class BookGeneratorApp:
     def _print_banner(self) -> None:
         """打印程序横幅"""
         print("=" * 50)
-        print("     AI辅助书籍生成器 v1.2.2")
+        print("     AI辅助书籍生成器 v1.2.3")
         print("=" * 50)
         print("将大文本文件转换为结构完整的书籍")
         print("-" * 50)
@@ -138,19 +138,19 @@ class BookGeneratorApp:
             self.file_reader = FileReader(file_path)
             stats = self.file_reader.get_statistics()
             
-            print(f"\n文件信息:")
-            print(f"  路径: {stats['file_path']}")
-            print(f"  大小: {stats['file_size_kb']} KB")
-            print(f"  编码: {stats['encoding']}")
-            print(f"  字符数: {stats['total_chars']:,}")
-            print(f"  行数: {stats['line_count']:,}")
-            print(f"  估算字数: {stats['estimated_words']:,}")
-            print(f"  预估阅读时间: {self.file_reader.estimate_reading_time():.0f} 分钟")
+            self.logger.info("文件信息:")
+            self.logger.info(f"  路径: {stats['file_path']}")
+            self.logger.info(f"  大小: {stats['file_size_kb']} KB")
+            self.logger.info(f"  编码: {stats['encoding']}")
+            self.logger.info(f"  字符数: {stats['total_chars']:,}")
+            self.logger.info(f"  行数: {stats['line_count']:,}")
+            self.logger.info(f"  估算字数: {stats['estimated_words']:,}")
+            self.logger.info(f"  预估阅读时间: {self.file_reader.estimate_reading_time():.0f} 分钟")
             
             # 读取完整内容
-            print("\n正在读取文件内容...")
+            self.logger.info("正在读取文件内容...")
             self.original_content = self.file_reader.read_all()
-            print(f"读取完成，共 {len(self.original_content):,} 字符")
+            self.logger.info(f"读取完成，共 {len(self.original_content):,} 字符")
             
         except Exception as e:
             raise Exception(f"读取文件失败: {e}")
@@ -164,20 +164,20 @@ class BookGeneratorApp:
             api_key = self.config.get_doubao_api_key()
             # 隐藏部分API密钥显示
             masked_key = api_key[:8] + "..." + api_key[-4:]
-            print(f"API密钥: {masked_key}")
-            print(f"模型: {self.config.get_doubao_model()}")
-            print(f"基础URL: {self.config.get_doubao_base_url()}")
+            self.logger.info(f"API密钥: {masked_key}")
+            self.logger.info(f"模型: {self.config.get_doubao_model()}")
+            self.logger.info(f"基础URL: {self.config.get_doubao_base_url()}")
             
             # 测试API连接
-            print("\n正在测试API连接...")
+            self.logger.info("正在测试API连接...")
             self.client = DoubaoClient()
             
             # 发送简单测试请求
             test_response = self.client.chat("你好", max_tokens=10)
-            print(f"API连接测试成功！")
+            self.logger.info("API连接测试成功！")
             
         except ValueError as e:
-            print(f"API配置错误: {e}")
+            self.logger.error(f"API配置错误: {e}")
             print("请检查config.yaml文件中的API配置")
             raise
         except Exception as e:
@@ -187,16 +187,15 @@ class BookGeneratorApp:
     
     def _step_analyze_file(self) -> None:
         """步骤3: 分析文件内容"""
-        print("\n【步骤3/6】全文阅读与分析")
-        print("-" * 30)
+        self.logger.section("【步骤3/6】全文阅读与分析")
         
         if not self.client:
             raise Exception("API客户端未初始化")
         
         # 使用全文分析器进行完整阅读
-        print(f"原始文本总长度: {len(self.original_content):,} 字符")
-        print("\n⚠️  重要：现在将分批投喂全文给AI，确保其完整理解原始素材")
-        print("这可能需要一些时间，请耐心等待...\n")
+        self.logger.info(f"原始文本总长度: {len(self.original_content):,} 字符")
+        self.logger.info("重要：现在将分批投喂全文给AI，确保其完整理解原始素材")
+        self.logger.info("这可能需要一些时间，请耐心等待...")
         
         try:
             # 创建全文分析器
@@ -205,69 +204,69 @@ class BookGeneratorApp:
             # 执行全文分析
             self.analysis_result = analyzer.analyze_full_text(self.original_content)
             
-            print("\n" + "=" * 50)
-            print("全文分析完成！")
-            print("=" * 50)
+            self.logger.section("全文分析完成！")
             
-            print("\n分析结果:")
+            self.logger.info("分析结果:")
             if "main_theme" in self.analysis_result:
-                print(f"  📌 主要主题: {self.analysis_result['main_theme']}")
+                self.logger.info(f"  主要主题: {self.analysis_result['main_theme']}")
             if "summary" in self.analysis_result:
                 summary = self.analysis_result['summary']
                 if len(summary) > 150:
                     summary = summary[:150] + "..."
-                print(f"  📝 内容摘要: {summary}")
+                self.logger.info(f"  内容摘要: {summary}")
             if "key_points" in self.analysis_result and isinstance(self.analysis_result['key_points'], list):
-                print(f"  🔑 关键要点:")
+                self.logger.info("  关键要点:")
                 for point in self.analysis_result['key_points'][:5]:
-                    print(f"    • {point}")
+                    self.logger.info(f"    - {point}")
             if "characters" in self.analysis_result:
-                print(f"  👥 涉及人物/群体: {', '.join(self.analysis_result['characters'][:3])}")
+                self.logger.info(f"  涉及人物/群体: {', '.join(self.analysis_result['characters'][:3])}")
             
-            print(f"\n✅ AI已完成全文阅读，现在可以基于完整理解生成书籍")
+            self.logger.info("AI已完成全文阅读，现在可以基于完整理解生成书籍")
             
         except Exception as e:
-            print(f"\n❌ 全文分析失败: {e}")
-            print("将使用简化分析继续...")
+            self.logger.error(f"全文分析失败: {e}")
+            self.logger.info("将使用简化分析继续...")
             # 降级处理：使用简单的片段分析
             sample_content = self.original_content[:8000]
             self.analysis_result = self.client.analyze_content(sample_content, "summary")
     
     def _step_generate_outline(self) -> None:
         """步骤4: 生成书籍大纲"""
-        print("\n【步骤4/6】生成书籍大纲")
-        print("-" * 30)
+        self.logger.section("【步骤4/6】生成书籍大纲")
         
         # 显示配置
         total_chapters = self.config.get_total_chapters()
         chapter_words = self.config.get_chapter_target_words()
         total_words = len(self.original_content)
         
-        print(f"生成配置:")
-        print(f"  章节数: {total_chapters}章")
-        print(f"  每章字数: 约{chapter_words:,}字")
-        print(f"  原文总字数: {total_words:,}字")
+        self.logger.info("生成配置:")
+        self.logger.info(f"  章节数: {total_chapters}章")
+        self.logger.info(f"  每章字数: 约{chapter_words:,}字")
+        self.logger.info(f"  原文总字数: {total_words:,}字")
         
-        # 确认或修改
+        # 确认或修改（保持终端交互）
         print("\n是否使用以上配置生成大纲？")
         print("  1. 使用默认配置")
         print("  2. 自定义配置")
         
         choice = input("请选择 (1/2): ").strip()
+        self.logger.info(f"用户选择: {choice}")
         
         if choice == "2":
             try:
                 chapters_input = input(f"章节数 (默认{total_chapters}): ").strip()
                 if chapters_input:
                     total_chapters = int(chapters_input)
+                    self.logger.info(f"用户设置章节数: {total_chapters}")
                 
                 words_input = input(f"每章字数 (默认{chapter_words}): ").strip()
                 if words_input:
                     chapter_words = int(words_input)
+                    self.logger.info(f"用户设置每章字数: {chapter_words}")
             except ValueError:
-                print("输入无效，使用默认配置")
+                self.logger.warning("输入无效，使用默认配置")
         
-        print(f"\n正在生成大纲...")
+        self.logger.info("正在生成大纲...")
         self.logger.info(f"开始生成大纲: {total_chapters}章, 每章约{chapter_words}字")
         self.logger.info(f"预计总字数: {total_chapters * chapter_words}")
         self.logger.info("正在调用AI生成三级目录结构(章-节-小节)，这可能需要3-5分钟...")
@@ -291,32 +290,31 @@ class BookGeneratorApp:
             self.logger.info(f"书名: {self.outline.title}")
             print(f"  书名: {self.outline.title}")
             if self.outline.subtitle:
+                self.logger.info(f"副标题: {self.outline.subtitle}")
                 print(f"  副标题: {self.outline.subtitle}")
+            self.logger.info(f"章节数: {len(self.outline.chapters)}章")
             print(f"  章节数: {len(self.outline.chapters)}章")
-            print(f"\n详细目录结构:")
-            print("=" * 50)
+            self.logger.info("详细目录结构:")
             for ch in self.outline.chapters:
-                print(f"\n第{ch.chapter_number}章: {ch.title}")
-                print(f"  概要: {ch.summary[:60]}...")
+                self.logger.info(f"第{ch.chapter_number}章: {ch.title}")
                 for sub in ch.subchapters:
-                    print(f"  {sub.subchapter_number} {sub.title}")
+                    self.logger.info(f"  {sub.subchapter_number} {sub.title}")
                     for sec in sub.sections:
-                        print(f"    {sec.section_number} {sec.title}")
+                        self.logger.info(f"    {sec.section_number} {sec.title}")
             
             # 保存大纲
             temp_dir = self.config.get_temp_dir()
             os.makedirs(temp_dir, exist_ok=True)
             outline_path = os.path.join(temp_dir, "book_outline.json")
             self.outline_generator.save_outline(self.outline, outline_path)
-            print(f"\n大纲已保存到: {outline_path}")
+            self.logger.info(f"大纲已保存到: {outline_path}")
             
         except Exception as e:
             raise Exception(f"生成大纲失败: {e}")
     
     def _step_generate_content(self) -> None:
         """步骤5: 生成书籍内容"""
-        print("\n【步骤5/6】生成书籍内容")
-        print("-" * 30)
+        self.logger.section("【步骤5/6】生成书籍内容")
         
         if not self.outline:
             raise Exception("大纲未生成")
@@ -327,13 +325,13 @@ class BookGeneratorApp:
         
         resume = False
         if os.path.exists(progress_file):
-            print("检测到未完成的生成任务")
+            self.logger.info("检测到未完成的生成任务")
             choice = input("是否从上次中断处继续? (y/n): ").strip().lower()
             resume = choice in ('y', 'yes', '是')
+            self.logger.info(f"用户选择: {'继续' if resume else '重新开始'}")
         
-        print(f"\n开始生成内容...")
-        print(f"共 {len(self.outline.chapters)} 章需要生成")
-        print("此过程可能需要较长时间，请耐心等待...\n")
+        self.logger.info(f"开始生成内容，共 {len(self.outline.chapters)} 章需要生成")
+        self.logger.info("此过程可能需要较长时间，请耐心等待...")
         
         try:
             # 获取全文理解摘要
@@ -345,9 +343,7 @@ class BookGeneratorApp:
                 if 'raw_understanding' in self.analysis_result:
                     full_understanding = self.analysis_result['raw_understanding']
             
-            print(f"\n📚 全文理解摘要（前200字）:")
-            preview = full_understanding[:200] + "..." if len(full_understanding) > 200 else full_understanding
-            print(f"  {preview}\n")
+            self.logger.info(f"全文理解摘要（前200字）: {full_understanding[:200]}...")
             
             self.content_generator = ContentGenerator(
                 original_content=self.original_content,
@@ -361,7 +357,7 @@ class BookGeneratorApp:
                 final_progress = progress
             
             if final_progress and final_progress.status == "completed":
-                print("\n内容生成完成！")
+                self.logger.info("内容生成完成！")
             elif final_progress and final_progress.status == "error":
                 raise Exception(f"生成失败: {final_progress.error_message}")
                 
@@ -388,8 +384,7 @@ class BookGeneratorApp:
     
     def _step_export_document(self) -> None:
         """步骤6: 导出文档"""
-        print("\n\n【步骤6/6】导出Word文档")
-        print("-" * 30)
+        self.logger.section("【步骤6/6】导出Word文档")
         
         if not self.content_generator or not self.outline:
             raise Exception("内容未生成")
@@ -405,7 +400,7 @@ class BookGeneratorApp:
         if not output_path.endswith('.docx'):
             output_path += '.docx'
         
-        print(f"\n正在导出文档...")
+        self.logger.info(f"正在导出文档到: {output_path}")
         
         try:
             exporter = DocExporter()
@@ -415,20 +410,20 @@ class BookGeneratorApp:
             )
             saved_path = exporter.save(output_path)
             
-            print(f"文档已保存到: {saved_path}")
+            self.logger.info(f"文档已保存到: {saved_path}")
             
             # 显示统计信息
             total_chars = sum(len(content) for content in self.content_generator.progress.generated_content.values())
-            print(f"文档总字符数: {total_chars:,}")
+            self.logger.info(f"文档总字符数: {total_chars:,}")
             
         except Exception as e:
             raise Exception(f"导出文档失败: {e}")
     
     def _handle_interrupt(self) -> None:
         """处理用户中断"""
-        print("\n正在保存当前进度...")
+        self.logger.info("正在保存当前进度...")
         # 进度会在生成过程中自动保存
-        print("进度已保存，下次运行时可选择继续")
+        self.logger.info("进度已保存，下次运行时可选择继续")
         sys.exit(0)
 
 

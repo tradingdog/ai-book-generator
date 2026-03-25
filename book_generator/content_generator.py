@@ -246,7 +246,7 @@ class ContentGenerator:
 - 章节号：第{chapter.chapter_number}章
 - 标题：{chapter.title}
 - 目标字数：{chapter.target_words}字
-- 小节安排：{', '.join(chapter.subsections)}
+- 子章节安排：{', '.join([sub.title for sub in chapter.subchapters])}
 
 【本章概要】
 {chapter.summary}
